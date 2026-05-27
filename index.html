@@ -559,21 +559,21 @@ section {
     <!-- Concept pills -->
     <div class="concept-grid">
       <div class="concept-item">
-        <svg class="concept-icon" viewBox="0 0 36 36"><rect x="2" y="2" width="14" height="14" rx="2" fill="none" stroke="var(--arancio)" stroke-width="1.5"/><rect x="20" y="2" width="14" height="14" rx="2" fill="none" stroke="var(--arancio)" stroke-width="1.5" opacity="0.5"/><rect x="2" y="20" width="14" height="14" rx="2" fill="none" stroke="var(--arancio)" stroke-width="1.5" opacity="0.3"/><rect x="20" y="20" width="14" height="14" rx="2" fill="none" stroke="var(--arancio)" stroke-width="1.5" opacity="0.15"/></svg>
+        <svg class="concept-icon" viewBox="0 0 36 36"><rect x="2" y="2" width="14" height="14" rx="2" fill="none" stroke="var(--arancio)" stroke-width="1.5"/><rect x="20" y="2" width="14" height="14" rx="2" fill="none" stroke="var(--arancio)" stroke-width="1.5"/></svg>
         <div>
           <div class="concept-k">01 · Ritmo</div>
           <div class="concept-text">Forme organizzate in sequenze, variazioni e intervalli</div>
         </div>
       </div>
       <div class="concept-item">
-        <svg class="concept-icon" viewBox="0 0 36 36"><path d="M8 28 Q18 8 28 28" fill="none" stroke="var(--oro)" stroke-width="1.8" stroke-linecap="round"/><circle cx="18" cy="14" r="3" fill="var(--oro)" opacity="0.6"/></svg>
+        <svg class="concept-icon" viewBox="0 0 36 36"><path d="M8 28 Q18 8 28 28" fill="none" stroke="var(--oro)" stroke-width="1.8" stroke-linecap="round"/><circle cx="18" cy="14" r="3" fill="var(--oro)"/></svg>
         <div>
           <div class="concept-k">02 · Tocco</div>
           <div class="concept-text">Superfici e consistenze oltre la visione</div>
         </div>
       </div>
       <div class="concept-item">
-        <svg class="concept-icon" viewBox="0 0 36 36"><rect x="4" y="10" width="4" height="16" rx="1" fill="#4a6741" opacity="0.5"/><rect x="12" y="6" width="4" height="20" rx="1" fill="#4a6741" opacity="0.7"/><rect x="20" y="12" width="4" height="14" rx="1" fill="#4a6741" opacity="0.9"/><rect x="28" y="8" width="4" height="18" rx="1" fill="#4a6741"/></svg>
+        <svg class="concept-icon" viewBox="0 0 36 36"><rect x="4" y="10" width="4" height="16" rx="1" fill="#4a6741" opacity="0.5"/><rect x="12" y="6" width="4" height="20" rx="1" fill="#4a6741" opacity="0.7"/><rect x="20" y="8" width="4" height="18" rx="1" fill="#4a6741"/></svg>
         <div>
           <div class="concept-k">03 · Percezione</div>
           <div class="concept-text">Relazione attiva: forma e senso si costruiscono insieme</div>
@@ -971,10 +971,10 @@ function syncIcons(paused) {
       });
     } else if (activeTrack.type === 'intro') {
       document.getElementById('heroAudioIcon').innerHTML = PAUSE_SVG;
-      document.getElementById('playIcon').innerHTML = PLAY_SVG;
+      document.getElementById('playIcon').innerHTML = PAUSE_SVG;
     } else if (activeTrack.type === 'trad-tattile') {
       document.getElementById('tradTattileIcon').innerHTML = PAUSE_SVG;
-      document.getElementById('playIcon').innerHTML = PLAY_SVG;
+      document.getElementById('playIcon').innerHTML = PAUSE_SVG;
     }
   }
 }
@@ -1004,100 +1004,76 @@ function animateViz(on) {
   }
 }
 
-function tick() {
-  if (!playing || !activeTrack) return;
+function updateProgressBar() {
+  const pct = (globalAudio.currentTime / globalAudio.duration) * 100;
+  document.getElementById('progressInner').style.width = pct.toFixed(1)+'%';
   document.getElementById('timeNow').textContent = formatTime(globalAudio.currentTime);
-  document.getElementById('progressInner').style.width = globalAudio.duration
-    ? ((globalAudio.currentTime/globalAudio.duration)*100)+'%' : '0%';
-  if (globalAudio.duration) document.getElementById('timeTot').textContent = formatTime(globalAudio.duration);
-  raf = requestAnimationFrame(tick);
+  document.getElementById('timeTot').textContent = formatTime(globalAudio.duration);
 }
 
-function playTrack(track) {
-  cancelAnimationFrame(raf);
-  const same = activeTrack && activeTrack.src === track.src;
+function play(track) {
   activeTrack = track;
-  if (!same) {
-    globalAudio.src = track.src;
-    globalAudio.currentTime = 0;
-    document.getElementById('progressInner').style.width = '0%';
-    document.getElementById('timeNow').textContent = '0:00';
+  const src = `./audio/${track.type === 'intro' ? 'generale' : track.type === 'trad-tattile' ? 'trad-tattle' : track.n}.mp3`;
+  
+  if (globalAudio.src !== src) {
+    globalAudio.src = src;
   }
-  document.getElementById('nowPlaying').textContent = track.label;
-  document.getElementById('operaIndicator').textContent = track.indicator;
+  globalAudio.play().catch(e => console.warn('Play fail:', e));
   playing = true;
   syncIcons(false);
   animateViz(true);
-  tick();
-  globalAudio.play().catch(() => {
-    playing = false; syncIcons(true); animateViz(false);
-  });
-  globalAudio.onended = () => {
-    playing = false; syncIcons(true); animateViz(false);
-  };
+  
+  if (!raf) {
+    raf = setInterval(updateProgressBar, 100);
+  }
 }
 
-function pauseActive() {
-  if (!activeTrack) return;
+function pause() {
   globalAudio.pause();
   playing = false;
   syncIcons(true);
-  cancelAnimationFrame(raf);
   animateViz(false);
+  if (raf) { clearInterval(raf); raf = null; }
 }
 
 function togglePlay() {
-  if (!activeTrack) { playIntroAudio(); return; }
-  if (globalAudio.paused) playTrack(activeTrack);
-  else pauseActive();
+  if (playing) {
+    pause();
+  } else if (activeTrack) {
+    play(activeTrack);
+  }
 }
 
 function playIntroAudio() {
-  if (activeTrack && activeTrack.type==='intro' && !globalAudio.paused) { pauseActive(); return; }
-  playTrack({ src:'./audio/generale.mp3', type:'intro', n:null, label:'Sinfonia Materiale — Introduzione', indicator:'Intro' });
+  play({type: 'intro'});
 }
+
 function playTradTattileAudio() {
-  if (activeTrack && activeTrack.type==='trad-tattile' && !globalAudio.paused) { pauseActive(); return; }
-  playTrack({ src:'./audio/trad-tattle.mp3', type:'trad-tattile', n:null, label:'Guida all\'esperienza', indicator:'Trad. tattile' });
+  play({type: 'trad-tattile'});
 }
+
 function toggleOpAudio(n) {
-  if (activeTrack && activeTrack.type==='opera' && activeTrack.n===n && !globalAudio.paused) { pauseActive(); return; }
-  playTrack({ src:'./audio/'+n+'.mp3', type:'opera', n:n, label:'Senza titolo n. '+n+' — descrizione', indicator:'Op. '+n });
+  if (activeTrack && activeTrack.type === 'opera' && activeTrack.n === n) {
+    playing ? pause() : play(activeTrack);
+  } else {
+    play({type: 'opera', n: n});
+  }
 }
 
 function seekTo(e) {
-  const rect = e.currentTarget.getBoundingClientRect();
-  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-  if (globalAudio.duration) globalAudio.currentTime = pct * globalAudio.duration;
+  const outer = document.getElementById('progressOuter');
+  const rect = outer.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  globalAudio.currentTime = pct * globalAudio.duration;
+  updateProgressBar();
 }
 
-globalAudio.addEventListener('loadedmetadata', () => {
-  document.getElementById('timeTot').textContent = formatTime(globalAudio.duration);
+globalAudio.addEventListener('ended', () => {
+  pause();
 });
 
-// ── NAV ACTIVE ON SCROLL ──
-const navLinks = document.querySelectorAll('.np');
-window.addEventListener('scroll', () => {
-  const y = window.scrollY + 100;
-  ['intro','opere','esperienza'].forEach(id => {
-    const el = document.getElementById(id);
-    const link = document.querySelector('a[href="#'+id+'"]');
-    if (!el || !link) return;
-    if (y >= el.offsetTop && y < el.offsetTop + el.offsetHeight) {
-      navLinks.forEach(l => l.classList.remove('active'));
-      link.classList.add('active');
-    }
-  });
-});
-
-// ── SMOOTH NAV ──
-document.querySelectorAll('a[href^="#"]').forEach(a => {
-  a.addEventListener('click', e => {
-    e.preventDefault();
-    const t = document.querySelector(a.getAttribute('href'));
-    if (t) t.scrollIntoView({ behavior:'smooth', block:'start' });
-  });
-});
+// Sync initial state
+syncIcons(true);
 </script>
 </body>
 </html>
